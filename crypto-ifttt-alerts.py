@@ -12,15 +12,8 @@ import requests
 import os
 import secrets
 
-
 # The endpoint we'll hit to get XBT price info.
 TICKER_URL = 'https://api.kraken.com/0/public/Ticker?pair=XBTEUR'
-
-# Get the location for our price alerts config.
-CONFIG = os.path.join(
-    os.path.dirname(os.path.realpath(__file__)),
-    'xbt-rules.txt',
-)
 
 # Get the location for previous price file.
 PREVIOUS = os.path.join(
@@ -31,8 +24,8 @@ PREVIOUS = os.path.join(
 # The name of our IFTTT web request event.
 IFTTT_EVENT = secrets.IFTTT_EVENT
 
-# Our IFTTT secret key. Protect this if you don't want attackers to send
-# you notifications.
+# Our IFTTT secret key. Protect this if you don't
+# want attackers to send you notifications.
 IFTTT_KEY = secrets.IFTTT_KEY
 
 # The endpoint we'll use to send trigger price alert notifications.
@@ -41,128 +34,42 @@ IFTTT_URL = (
     .format(IFTTT_EVENT, IFTTT_KEY)
 )
 
+def notify(XBTPrice, XBTPreviousPrice):
+    """Construct and send a notification for this price rule.
 
-class PriceRule:
-    """Handle individual price rules.
+    This doesn't check whether or not the current price differs enough
+    from the previous price, it just sends the notification.
 
-    This class parses, validates, compares, and sends notifications for
-    individual price rules.
+    Args:
+        XBTPrice (float): The current XBT price
+        XBTPreviousPrice (float): The XBT price last time a notification was sent
     """
 
-    # Map the operator symbol to the corresponding Python comparison operator
-    OPERATOR_MAP = {'>': operator.gt, '<': operator.lt}
+    # Get the correct operator word. e.g. "above",
+    # and calculate the proper limit to compare to.
+    if XBTPrice > XBTPreviousPrice:
+        word = 'above'
+        threshold = int(XBTPrice / 1000) * 1000
+    else:
+        word = 'below'
+        threshold = (int(XBTPrice / 1000) + 1) * 1000
+    # XBTPrice is never equal to XBTPreviousPrice,
+    # or notify would not have been called
 
-    # Map the operator symbol to the corresponding word
-    WORD_MAP = {'>': 'above', '<': 'below'}
+    # Construct the data to send to the IFTTT webhook
+    data = {
+        'value1': '{0} €{1:,d}'.format(word, threshold),
+        'value2': '€{:,.2f}'.format(XBTPrice)
+    }
 
-    def __init__(self, originalLine):
-        """Initialize PriceRule.
-
-        This requires a single line from the price rules config file.
-
-        Args:
-            originalLine (str): A single line from the price rules config.
-        """
-        self.originalLine = originalLine
-        self.parseLine(originalLine)
-
-    def parseLine(self, line):
-        """Parse the price rule config line.
-
-        This parses the config line, validates it, then sets required instance
-        variables.
-
-        Args:
-            line (str): config line.
-
-        Raises:
-            ValueError: If the config line is invalid.
-        """
-
-        # Remove whitespace surrounding the line.
-        line = line.strip()
-
-        # Get the opreator symbol. We assume the operator symbol is the first
-        # non-whitespace character.
-        operatorSymbol = line[0]
-
-        # The remainder of the line is the threshold. Remove any non numeric
-        # characters.
-        threshold = re.sub(r'[^\d]', '', line[1:].strip())
-
-        # Ensure the operator symbol makes sense.
-        if operatorSymbol not in ['>', '<']:
-            raise ValueError('Line must start with > or <.')
-
-        # Ensure the threshold can be converted to float.
-        try:
-            threshold = float(threshold)
-        except TypeError:
-            raise ValueError('Line must contain a valid price.')
-
-        # If all is well, set required instance variables.
-        self.operatorSymbol = operatorSymbol
-        self.operator = self.OPERATOR_MAP[operatorSymbol]
-        self.threshold = threshold
-
-    def matches(self, value):
-        """Check if value matches our price rule condition.
-
-        Assuming the operator is ">" or "greater than",
-
-        self.operator(value, self.threshold)
-
-        is the equivalent of:
-
-        value > self.threshold
-
-        Args:
-            value (float): The XBT price.
-        """
-        return self.operator(value, self.threshold)
-
-    def notify(self, XBTPrice):
-        """Construct and send a notification for this price rule.
-
-        This doesn't check whether or not the price rule condition is met, it
-        just sends the notification.
-
-        Args:
-            XBTPrice (float): The XBT price :)
-        """
-
-        # Get the correct operator word. e.g. "above" for ">".
-        word = self.WORD_MAP[self.operatorSymbol]
-
-        # Construct the data dict to send to the IFTTT webhook
-        data = {
-            'value1': '{0} €{1:,.2f}'.format(word, self.threshold),
-            'value2': '€{:,.2f}'.format(XBTPrice)
-        }
-
-        # Send the webhook, which then triggers the mobile notification
-        requests.post(IFTTT_URL, json=data)
-
-def loadPriceRules():
-    """Load the price rules config file, create a PriceRule for each line.
-
-    Returns:
-        list: A list of PriceRule objects.
-    """
-    rules = []
-
-    with open(CONFIG) as configFile:
-        for line in configFile:
-            rules.append(PriceRule(line))
-
-    return rules
-
+    # Send the webhook, which then triggers the mobile notification
+    requests.post(IFTTT_URL, json=data)
 
 def getXBTPrice():
     """Hit the Kraken API and get the current XBT price.
 
     Returns:
-        float: XBT price.
+        float: The current XBT price.
 
     Raises:
         RuntimeError: if request fails or response is invalid.
@@ -174,10 +81,10 @@ def getXBTPrice():
         raise RuntimeError('Could not parse API response.')
 
 def loadPreviousXBTPrice():
-    """Load the previous price from file, return the previous price.
+    """Load the previous price from file and return the loaded price.
 
     Returns:
-        float: previous XBT price.
+        float: The XBT price last time a notification was sent
     """
 
     with open(PREVIOUS) as priceFile:
@@ -187,33 +94,47 @@ def loadPreviousXBTPrice():
     return previous
 
 def saveXBTPrice(XBTPrice):
-    """Save the price to a file, to function as the 
+    """Save the price to a file, to function as the
     previous price for the next run of the script.
+
+    Args:
+        XBTPrice (float): The current XBT price
+
     """
+
     f = open(PREVIOUS,"w+")
     f.truncate(0)
     f.write(str(XBTPrice))
     f.close()
 
-def isSafeDistance(price1, price2):
-    if abs(price1 - price2) > 250:
+def isSafeDistance(XBTPrice, XBTPreviousPrice):
+    """Calculates if the two prices differ enough
+    from each other to warrant sending a notification.
+
+    Args:
+        XBTPrice (float): The current XBT price
+        XBTPreviousPrice (float): The XBT price last time a notification was sent
+
+    Returns:
+        boolean: True if prices differ enough, otherwise False
+    """
+    if abs(XBTPrice - XBTPreviousPrice) > 250:
         return True
     else:
         return False
 
 def checkXBT():
-    # Get the current and previous XBT prices
+    """Checks if the new XBT price has changed
+    significantly since last sending a notification.
+    If so, stores new price and sends a new notification.
+    """
+
     XBTPrice = getXBTPrice()
     XBTPreviousPrice = loadPreviousXBTPrice()
 
-    # Iterate through each price rule, and check for matches.
-    for rule in loadPriceRules():
-        # If we find a match, send the notification and stop the loop.
-        if rule.matches(XBTPrice) and isSafeDistance(XBTPrice, XBTPreviousPrice):
-            saveXBTPrice(str(XBTPrice))
-            rule.notify(XBTPrice)
-            break
-
+    if isSafeDistance(XBTPrice, XBTPreviousPrice):
+        saveXBTPrice(str(XBTPrice))
+        notify(XBTPrice, XBTPreviousPrice)
 
 if __name__ == '__main__':
     checkXBT()
