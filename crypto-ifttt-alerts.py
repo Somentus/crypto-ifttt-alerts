@@ -59,7 +59,7 @@ def notify(XBTPrice, XBTPreviousPrice):
     # Construct the data to send to the IFTTT webhook
     data = {
         'value1': '{0} €{1:,d}'.format(word, threshold),
-        'value2': '€{:,.2f}'.format(XBTPrice)
+        'value2': '€{:,d}'.format(int(XBTPrice))
     }
 
     # Send the webhook, which then triggers the mobile notification
