@@ -55,18 +55,18 @@ class PriceRule:
     # Map the operator symbol to the corresponding word
     WORD_MAP = {'>': 'above', '<': 'below'}
 
-    def __init__(self, original_line):
+    def __init__(self, originalLine):
         """Initialize PriceRule.
 
         This requires a single line from the price rules config file.
 
         Args:
-            original_line (str): A single line from the price rules config.
+            originalLine (str): A single line from the price rules config.
         """
-        self.original_line = original_line
-        self.parse_line(original_line)
+        self.originalLine = originalLine
+        self.parseLine(originalLine)
 
-    def parse_line(self, line):
+    def parseLine(self, line):
         """Parse the price rule config line.
 
         This parses the config line, validates it, then sets required instance
@@ -84,14 +84,14 @@ class PriceRule:
 
         # Get the opreator symbol. We assume the operator symbol is the first
         # non-whitespace character.
-        operator_symbol = line[0]
+        operatorSymbol = line[0]
 
         # The remainder of the line is the threshold. Remove any non numeric
         # characters.
         threshold = re.sub(r'[^\d]', '', line[1:].strip())
 
         # Ensure the operator symbol makes sense.
-        if operator_symbol not in ['>', '<']:
+        if operatorSymbol not in ['>', '<']:
             raise ValueError('Line must start with > or <.')
 
         # Ensure the threshold can be converted to float.
@@ -101,8 +101,8 @@ class PriceRule:
             raise ValueError('Line must contain a valid price.')
 
         # If all is well, set required instance variables.
-        self.operator_symbol = operator_symbol
-        self.operator = self.OPERATOR_MAP[operator_symbol]
+        self.operatorSymbol = operatorSymbol
+        self.operator = self.OPERATOR_MAP[operatorSymbol]
         self.threshold = threshold
 
     def matches(self, value):
@@ -121,52 +121,29 @@ class PriceRule:
         """
         return self.operator(value, self.threshold)
 
-    def notify(self, xbt_price):
+    def notify(self, XBTPrice):
         """Construct and send a notification for this price rule.
 
         This doesn't check whether or not the price rule condition is met, it
         just sends the notification.
 
         Args:
-            xbt_price (float): The XBT price :)
+            XBTPrice (float): The XBT price :)
         """
 
         # Get the correct operator word. e.g. "above" for ">".
-        word = self.WORD_MAP[self.operator_symbol]
+        word = self.WORD_MAP[self.operatorSymbol]
 
         # Construct the data dict to send to the IFTTT webhook
         data = {
             'value1': '{0} €{1:,.2f}'.format(word, self.threshold),
-            'value2': '€{:,.2f}'.format(xbt_price)
+            'value2': '€{:,.2f}'.format(XBTPrice)
         }
 
         # Send the webhook, which then triggers the mobile notification
         requests.post(IFTTT_URL, json=data)
 
-    def delete(self):
-        """Delete the line from the config file.
-
-        This assumes that once a notification has fired, it should not continue
-        firing.
-
-        There's probably a nicer way to do this.
-        """
-        new_lines = []
-
-        # Copy all lines from the original config, exclude this price rule.
-        with open(CONFIG) as config_file:
-            for line in config_file:
-                if line == self.original_line:
-                    continue
-                new_lines.append(line)
-
-        # Write all lines (except this one) to the config file.
-        with open(CONFIG, 'w') as config_file:
-            for line in new_lines:
-                config_file.write('{0}'.format(line))
-
-
-def load_price_rules():
+def loadPriceRules():
     """Load the price rules config file, create a PriceRule for each line.
 
     Returns:
@@ -174,14 +151,14 @@ def load_price_rules():
     """
     rules = []
 
-    with open(CONFIG) as config_file:
-        for line in config_file:
+    with open(CONFIG) as configFile:
+        for line in configFile:
             rules.append(PriceRule(line))
 
     return rules
 
 
-def get_xbt_price():
+def getXBTPrice():
     """Hit the Kraken API and get the current XBT price.
 
     Returns:
@@ -196,47 +173,47 @@ def get_xbt_price():
     except (IndexError, KeyError):
         raise RuntimeError('Could not parse API response.')
 
-def load_previous_xbt_price():
+def loadPreviousXBTPrice():
     """Load the previous price from file, return the previous price.
 
     Returns:
         float: previous XBT price.
     """
 
-    with open(PREVIOUS) as price_file:
-        for line in price_file:
+    with open(PREVIOUS) as priceFile:
+        for line in priceFile:
             previous = float(line.strip())
 
     return previous
 
-def save_xbt_price(xbt_price):
+def saveXBTPrice(XBTPrice):
     """Save the price to a file, to function as the 
     previous price for the next run of the script.
     """
     f = open(PREVIOUS,"w+")
     f.truncate(0)
-    f.write(str(xbt_price))
+    f.write(str(XBTPrice))
     f.close()
 
-def safe_distance(price1, price2):
+def isSafeDistance(price1, price2):
     if abs(price1 - price2) > 250:
         return True
     else:
         return False
 
-def check_xbt():
+def checkXBT():
     # Get the current and previous XBT prices
-    xbt_price = get_xbt_price()
-    xbt_previous_price = load_previous_xbt_price()
+    XBTPrice = getXBTPrice()
+    XBTPreviousPrice = loadPreviousXBTPrice()
 
     # Iterate through each price rule, and check for matches.
-    for rule in load_price_rules():
+    for rule in loadPriceRules():
         # If we find a match, send the notification and stop the loop.
-        if rule.matches(xbt_price) and safe_distance(xbt_price, xbt_previous_price):
-            save_xbt_price(str(xbt_price))
-            rule.notify(xbt_price)
+        if rule.matches(XBTPrice) and isSafeDistance(XBTPrice, XBTPreviousPrice):
+            saveXBTPrice(str(XBTPrice))
+            rule.notify(XBTPrice)
             break
 
 
 if __name__ == '__main__':
-    check_xbt()
+    checkXBT()
