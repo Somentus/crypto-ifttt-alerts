@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Crypto IFTTT Alerts
 Author: Somentus
-Version: 0.1.1
+Version: 0.2.1
 Project based on Tyler's guide:
 https://howchoo.com/pi/your-first-ifttt-project-bitcoin-price-alerts
 """
