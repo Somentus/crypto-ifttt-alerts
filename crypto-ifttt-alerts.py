@@ -45,20 +45,17 @@ def notify(XBTPrice, XBTPreviousPrice):
         XBTPreviousPrice (float): The XBT price last time a notification was sent
     """
 
-    # Get the correct operator word. e.g. "above",
-    # and calculate the proper limit to compare to.
+    # Get the correct operator word, e.g. "up"
     if XBTPrice > XBTPreviousPrice:
-        word = 'above'
-        threshold = int(XBTPrice / 1000) * 1000
+        word = 'up'
     else:
-        word = 'below'
-        threshold = (int(XBTPrice / 1000) + 1) * 1000
+        word = 'down'
     # XBTPrice is never equal to XBTPreviousPrice,
     # or notify would not have been called
 
     # Construct the data to send to the IFTTT webhook
     data = {
-        'value1': '{0} €{1:,d}'.format(word, threshold),
+        'value1': word,
         'value2': '€{:,d}'.format(int(XBTPrice))
     }
 
