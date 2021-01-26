@@ -10,6 +10,8 @@ import operator
 import re
 import requests
 import os
+import datetime
+
 import secrets
 
 # The endpoint we'll hit to get XBT price info.
@@ -53,10 +55,14 @@ def notify(XBTPrice, XBTPreviousPrice):
     # XBTPrice is never equal to XBTPreviousPrice,
     # or notify would not have been called
 
+    # Get the current time in format hh:mm
+    time = datetime.datetime.now().strftime("%H:%M")
+
     # Construct the data to send to the IFTTT webhook
     data = {
-        'value1': word,
-        'value2': '€{:,d}'.format(int(XBTPrice))
+        'value1': time,
+        'value2': word,
+        'value3': '€{:,d}'.format(int(XBTPrice))
     }
 
     # Send the webhook, which then triggers the mobile notification
