@@ -36,6 +36,9 @@ IFTTT_URL = (
     .format(IFTTT_EVENT, IFTTT_KEY)
 )
 
+# The price change needed to send a new notification
+PRICE_CHANGE = 1000
+
 def notify(XBTPrice, XBTPreviousPrice):
     """Construct and send a notification for this price rule.
 
@@ -121,7 +124,7 @@ def isSafeDistance(XBTPrice, XBTPreviousPrice):
     Returns:
         boolean: True if prices differ enough, otherwise False
     """
-    if abs(XBTPrice - XBTPreviousPrice) > 250:
+    if abs(XBTPrice - XBTPreviousPrice) > PRICE_CHANGE:
         return True
     else:
         return False
